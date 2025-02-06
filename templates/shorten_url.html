@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shortened URL Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>URL Shortener</h1>
+        <input type="url" id="url" required placeholder="Enter your URL">
+        <button onclick="get_shorturl()">Generate Short URL</button>
+
+        <div id="short_url"></div>
+        <div id="qrcode" style="display:none;"></div>
+        <div id="counterDisplay"></div>
+
+        <div class="buttons" id="actionButtons" style="display: none;">
+            <button onclick="copy_url()"><i class="fa-solid fa-copy"></i> Copy</button>
+            <button onclick="download_qr()"><i class="fa-solid fa-download"></i> Download QR</button>
+            <button onclick="count_display()"><i class="fa-solid fa-chart-bar"></i> Counter</button>
+        </div>
+    </div>
+
+    <script>
+        let qrcode;
+
+        function get_shorturl() {
+            let url = document.getElementById('url').value;
+            if (!url) {
+                alert("Please enter a URL");
+                return;
+            }
+
+            $.ajax({
+                url: '/shortened_url',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({'url': url}),
+                success: function(response) {
+                    document.getElementById('short_url').innerHTML = 
+                        `<p>Shortened URL: <a href="${response.shortened_url}" target="_blank">${response.shortened_url}</a></p>`;
+                    
+                    // Generate QR Code
+                    document.getElementById('qrcode').innerHTML = '';
+                    qrcode = new QRCode(document.getElementById('qrcode'), response.shortened_url);
+                    
+                    document.getElementById("actionButtons").style.display = "flex";
+                },
+                error: function(error) {
+                    console.log(error);
+                }
+            });
+        }
+
+        function copy_url() {
+            let shortUrlElement = document.getElementById('short_url');
+            let shortUrl = shortUrlElement.querySelector('a');  
+
+            if (!shortUrl) {
+                alert("No URL to copy!");
+                return;
+            }
+
+            navigator.clipboard.writeText(shortUrl.href).then(() => {
+                alert("Copied: " + shortUrl.href);
+            }).catch(err => {
+                console.error("Copy failed", err);
+                alert("Failed to copy!");
+            });
+        }
+
+        function download_qr() {
+            let qrCanvas = document.querySelector('#qrcode canvas');
+            if (!qrCanvas) {
+                alert("Generate a URL first!");
+                return;
+            }
+
+            let link = document.createElement('a');
+            link.download = 'qr_code.png';
+            link.href = qrCanvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function count_display() {
+            let shortUrlElement = document.getElementById('short_url');
+            let shortUrl = shortUrlElement.querySelector('a');
+            
+            if (!shortUrl) {
+                alert("No URL to get click count!");
+                return;
+            }
+        
+            let shortPath = shortUrl.href.split('/').pop();
+            
+            $.ajax({
+                url: `/clicks/${shortPath}`,
+                type: 'GET',
+                success: function(response) {
+                    document.getElementById("counterDisplay").innerText = 
+                        `Click Count: ${response.click_count}`;
+                },
+                error: function(error) {
+                    console.log(error);
+                    alert("Failed to get click count!");
+                }
+            });
+        }
+    </script>
+</body>
+</html>
